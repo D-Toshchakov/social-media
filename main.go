@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/D-Toshchakov/pet/social-media/internal/database"
+	"github.com/D-Toshchakov/pet/social-media/routes"
 	"github.com/gorilla/mux"
 )
 
@@ -14,22 +15,17 @@ const address = "localhost:8080"
 
 func main() {
 	// Conecting to database
-	db, err := database.Connect()
+	err := database.Connect()
 	if err != nil {
-		panic(err)
-	}
-
-	err = db.AutoMigrate(database.User{}, database.Post{})
-	if err !=nil {
 		panic(err)
 	}
 
 	fmt.Println("Social Media backend")
 
 	r := mux.NewRouter()
-
-	r.HandleFunc("/", testHandler)
 	
+	routes.Setup(r)
+
 	srv := http.Server{
 		Handler:      r,
 		Addr:         address,
@@ -37,10 +33,4 @@ func main() {
 		ReadTimeout:  30 * time.Second,
 	}
 	log.Fatal(srv.ListenAndServe())
-}
-
-func testHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "Application/json")
-	w.WriteHeader(200)
-	w.Write([]byte("Hello world"))
 }
