@@ -9,7 +9,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func Connect() (*gorm.DB, error) {
+var DB *gorm.DB
+
+func Connect() error {
 	// loading env vars
 	if err := godotenv.Load(); err != nil {
 		panic("Env file not found")
@@ -18,27 +20,27 @@ func Connect() (*gorm.DB, error) {
 	// loading db env vars
 	pgDBName, ok := os.LookupEnv("POSTGRES_DB")
 	if !ok {
-		return nil, fmt.Errorf("can not load environmental var POSTGRES_DB")
+		return  fmt.Errorf("can not load environmental var POSTGRES_DB")
 	}
 
 	pgUser, ok := os.LookupEnv("POSTGRES_USER")
 	if !ok {
-		return nil, fmt.Errorf("can not load environmental var POSTGRES_USER")
+		return fmt.Errorf("can not load environmental var POSTGRES_USER")
 	}
 
 	pgPwd, ok := os.LookupEnv("POSTGRES_PASSWORD")
 	if !ok {
-		return nil, fmt.Errorf("can not load environmental var POSTGRES_PASSWORD")
+		return fmt.Errorf("can not load environmental var POSTGRES_PASSWORD")
 	}
 
 	pgHost, ok := os.LookupEnv("POSTGRES_HOST")
 	if !ok {
-		return nil, fmt.Errorf("can not load environmental var POSTGRES_HOST")
+		return fmt.Errorf("can not load environmental var POSTGRES_HOST")
 	}
 
 	pgPort, ok := os.LookupEnv("POSTGRES_PORT")
 	if !ok {
-		return nil, fmt.Errorf("can not load environmental var POSTGRES_PORT")
+		return fmt.Errorf("can not load environmental var POSTGRES_PORT")
 	}
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Shanghai",
@@ -55,5 +57,10 @@ func Connect() (*gorm.DB, error) {
 		panic("can not connect to DB")
 	}
 
-	return db, nil
+	DB = db
+	err = db.AutoMigrate(User{}, Post{})
+	if err !=nil {
+		panic(err)
+	}
+	return nil
 }
