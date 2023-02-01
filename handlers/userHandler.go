@@ -7,6 +7,7 @@ import (
 
 	"github.com/D-Toshchakov/pet/social-media/handlers/dto"
 	"github.com/D-Toshchakov/pet/social-media/internal/database"
+	"github.com/gorilla/mux"
 )
 
 func PostUser(w http.ResponseWriter, r *http.Request) {
@@ -19,8 +20,8 @@ func PostUser(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("can not parse user from body"))
+		return
 	}
-	fmt.Printf("%#v\n", user)
 
 	dbUser := &database.User{
 		Email:    user.Email,
@@ -29,21 +30,33 @@ func PostUser(w http.ResponseWriter, r *http.Request) {
 		Name:     user.Name,
 	}
 
-	pk := database.DB.Create(dbUser)
+	dbReq := database.DB.Create(dbUser)
+	if dbReq.Error != nil {
+		fmt.Println(dbReq.Error)
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte("user with this email already exists"))
+		return
+	}
 
-	fmt.Printf("New user %#v\n", pk)
+	// fmt.Printf("New user %#v\n", dbReq)
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(dbUser)
 
 }
 
 func GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
-	var	users []database.User
 
-	database.DB.Find(&users)
+	var users []database.User
+
+	dbReq := database.DB.Find(&users)
+	if dbReq.Error != nil {
+		fmt.Println(dbReq.Error)
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte("Users not found"))
+		return
+	}
 
 	fmt.Println("all users: ", users)
 
@@ -53,23 +66,54 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+
+	fmt.Println("email to find:", vars["email"])
+	var user database.User
+
+	dbReq := database.DB.Where("email = ?", vars["email"]).First(&user)
+	if dbReq.Error != nil {
+		fmt.Println(dbReq.Error)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("user with this email does not exist"))
+		return
+	}
+
+	json.NewEncoder(w).Encode(user)
+}
+
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	var newUser dto.UpdateUserDto
 
-	json.NewDecoder(r.Body).Decode(&newUser)
+	err := json.NewDecoder(r.Body).Decode(&newUser)
+	if err != nil {
+		fmt.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("can not parse user from body"))
+		return
+	}
 
 	fmt.Println("User to update: ", newUser)
 
 	user := database.User{}
 
-	database.DB.Where("email = ?", newUser.Email).First(&user)
+	dbReq := database.DB.Where("email = ?", newUser.Email).First(&user)
+	if dbReq.Error != nil {
+		fmt.Println(dbReq.Error)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("user with this email does not exist"))
+		return
+	}
 
 	database.DB.Model(&user).Updates(database.User{
-		Name: newUser.Name,
+		Name:     newUser.Name,
 		Password: newUser.Password,
-		Age: newUser.Age,
+		Age:      newUser.Age,
 	})
 
 	w.WriteHeader(http.StatusOK)
@@ -81,12 +125,13 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 func DeleteUserByEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var user dto.DeleteUserDto
+	vars := mux.Vars(r)
 
-	json.NewDecoder(r.Body).Decode(&user)
+	fmt.Println("User to delete: ", vars["email"])
 
-	fmt.Println("User to delete: ", user)
+	database.DB.Where("email = ?", vars["email"]).Delete(&database.User{})
 
-	database.DB.Where("email = ?", user.Email).Delete(&database.User{})
+	w.WriteHeader(http.StatusOK)
 
+	w.Write([]byte{})
 }
